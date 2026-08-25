@@ -215,13 +215,16 @@ function validateTrustFamilies(
     Object.hasOwn(fields, "sources") &&
     (!Array.isArray(fields.sources) ||
       fields.sources.some(
-        (entry) => !isRecord(entry) || !isNonEmptyString(entry.resource),
+        (entry) =>
+          !isRecord(entry) ||
+          !isNonEmptyString(entry.resource) ||
+          !isValidSourceRange(entry),
       ))
   ) {
     issues.push(
       issue(
         "invalid_sources",
-        "Field `sources` must be a YAML list of mappings, each with a non-empty string `resource`.",
+        "Field `sources` must be a YAML list of mappings, each with a non-empty string `resource`. Optional `start` and `end` must be positive integers with `end >= start`.",
       ),
     );
   }
@@ -249,6 +252,19 @@ function validateTrustFamilies(
       ),
     );
   }
+}
+
+/**
+ * Validates optional source line-range fields. Both `start` and `end` must be
+ * supplied together; when present they must be safe positive integers with
+ * `end >= start`. A source with neither field is valid.
+ */
+function isValidSourceRange(entry: Record<string, unknown>): boolean {
+  const { start, end } = entry;
+  if (start === undefined && end === undefined) return true;
+  if (typeof start !== "number" || typeof end !== "number") return false;
+  if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end)) return false;
+  return start >= 1 && end >= start;
 }
 
 /**

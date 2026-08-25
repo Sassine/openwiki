@@ -60,6 +60,12 @@ an update adds, deletes, moves, or materially regroups documentation pages,
 include /openwiki/quickstart.md in the plan so its task-routing map is refreshed.
 An update with no required page edits and no deletions may submit pages: [].
 
+For every page, supply seedPaths that point to concrete source files, not just directories. When a page covers a specific code region, include a line-range hint in the seedPath or page purpose.
+
+Populate relatedPages with the most useful cross-domain neighbors; page workers will turn these into relative Markdown links when appropriate.
+
+The quickstart must route readers through the hierarchy using clear H2 sections and relative links to major domains.
+
 For every page provide a concise purpose and useful seedPaths. seedPaths are
 starting points, not research boundaries. Copy only relevant global constraints
 from the user/connector context into that page's instructions array; do not copy
@@ -119,9 +125,15 @@ The page MUST begin with valid OKF concept frontmatter:
 ---
 type: <short descriptive concept type>
 title: <human-readable page title>
-description: <one or two sentence retrieval-oriented summary>
+description: <one or two sentence retrieval-oriented summary; required>
 tags: [<stable English tag>, ...]
 ---
+
+- Always write a non-empty \`description\` and 2-5 stable \`tags\`; indexes and the reader use them for search and filtering.
+- Use \`##\` for major sections and \`###\`/\`####\` for subsections. The reader builds an "On this page" outline from these headings, so keep them descriptive and do not skip levels.
+- Ground every substantive claim in source evidence. Claims tied to specific code MUST use \`repo://<path>#L<start>-L<end>\`. Whole-file citations are acceptable only when the entire file is the concept.
+- Link to related wiki pages using relative Markdown links, e.g. \`[authentication](auth.md)\`.
+
 Do not author generated, verified, sources, timestamp, or OpenWiki control fields; OpenWiki owns those. On update preserve unknown producer-defined frontmatter fields unless they are factually wrong.
 
 Research deeply enough to explain the important responsibilities, entrypoints,
@@ -136,8 +148,8 @@ writing it, call submit_page with the COMPLETE intended material Claim set for
 this page. Reuse an existing Claim id when retaining or revising a known
 proposition. Omit the id for a genuinely new Claim. Omitting an old Claim
 retracts it. Every evidence resource MUST be a canonical repository URI such as
-repo://src/agent/index.ts or repo://src/agent/index.ts#L40-L82; a bare path such
-as src/agent/index.ts is invalid. If submission validation fails, read the tool
+repo://src/agent/index.ts#L40-L82; a bare path such as src/agent/index.ts is invalid.
+For claims about specific code blocks, always include the line range. If submission validation fails, read the tool
 error, correct the page or Claim payload, and retry; the worker completes after
 one successful submission.
 

@@ -552,3 +552,47 @@ describe("renderFrontmatter", () => {
     ).toContain('title: "A: colon"');
   });
 });
+
+describe("validateOkfFrontmatter source ranges", () => {
+  test("accepts sources with optional start and end", () => {
+    const content = `---\ntype: Reference\nsources:\n  - resource: repo://src/agent/index.ts\n    start: 40\n    end: 82\n---\n\n# Page\n`;
+    expect(validateOkfFrontmatter(content)).toEqual({ valid: true });
+  });
+
+  test("accepts sources without start or end", () => {
+    const content = `---\ntype: Reference\nsources:\n  - resource: repo://README.md\n---\n\n# Page\n`;
+    expect(validateOkfFrontmatter(content)).toEqual({ valid: true });
+  });
+
+  test("rejects sources with end before start", () => {
+    const content = `---\ntype: Reference\nsources:\n  - resource: repo://src/a.ts\n    start: 10\n    end: 5\n---\n\n# Page\n`;
+    expect(validateOkfFrontmatter(content)).toMatchObject({
+      issues: [{ code: "invalid_sources" }],
+      valid: false,
+    });
+  });
+
+  test("rejects sources with non-integer start", () => {
+    const content = `---\ntype: Reference\nsources:\n  - resource: repo://src/a.ts\n    start: 1.5\n    end: 10\n---\n\n# Page\n`;
+    expect(validateOkfFrontmatter(content)).toMatchObject({
+      issues: [{ code: "invalid_sources" }],
+      valid: false,
+    });
+  });
+
+  test("rejects sources with start below one", () => {
+    const content = `---\ntype: Reference\nsources:\n  - resource: repo://src/a.ts\n    start: 0\n    end: 10\n---\n\n# Page\n`;
+    expect(validateOkfFrontmatter(content)).toMatchObject({
+      issues: [{ code: "invalid_sources" }],
+      valid: false,
+    });
+  });
+
+  test("rejects sources with only start or only end", () => {
+    const content = `---\ntype: Reference\nsources:\n  - resource: repo://src/a.ts\n    start: 5\n---\n\n# Page\n`;
+    expect(validateOkfFrontmatter(content)).toMatchObject({
+      issues: [{ code: "invalid_sources" }],
+      valid: false,
+    });
+  });
+});

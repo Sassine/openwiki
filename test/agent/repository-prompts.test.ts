@@ -89,6 +89,10 @@ describe("repository worker prompts", () => {
     expect(prompt).toContain("Populate relatedPages");
     expect(prompt).toContain("trace representative end-to-end control");
     expect(prompt).toContain("focused tests and neighboring");
+    expect(prompt).toContain("seedPaths that point to concrete source files");
+    expect(prompt).toContain("line-range hint");
+    expect(prompt).toContain("cross-domain neighbors");
+    expect(prompt).toContain("clear H2 sections");
     expect(prompt).not.toContain("force flag");
   });
 
@@ -116,6 +120,13 @@ describe("repository worker prompts", () => {
     expect(prompt).toMatch(
       /a bare path such\s+as src\/agent\/index\.ts is invalid/u,
     );
+    expect(prompt).toContain("repo://<path>#L<start>-L<end>");
+    expect(prompt).toContain("For claims about specific code blocks");
+    expect(prompt).toContain("[authentication](auth.md)");
+    expect(prompt).toContain(
+      "description: <one or two sentence retrieval-oriented summary; required>",
+    );
+    expect(prompt).toContain("tags: [<stable English tag>, ...]");
     expect(prompt).toContain("callers,");
     expect(prompt).toContain(
       "Do not turn the page into a source-file inventory",

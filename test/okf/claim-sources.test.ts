@@ -76,12 +76,26 @@ describe("synchronizeClaimSources", () => {
         resource: "https://example.com/policy",
       },
       {
+        id: openWikiSourceId("repo://src/a.ts#L1-L2"),
+        resource: "repo://src/a.ts",
+        start: 1,
+        end: 2,
+      },
+      {
         id: openWikiSourceId("repo://src/a.ts"),
         resource: "repo://src/a.ts",
       },
       {
-        id: openWikiSourceId("repo://src/z.ts"),
+        id: openWikiSourceId("repo://src/z.ts#L4-L8"),
         resource: "repo://src/z.ts",
+        start: 4,
+        end: 8,
+      },
+      {
+        id: openWikiSourceId("repo://src/z.ts#L20-L22"),
+        resource: "repo://src/z.ts",
+        start: 20,
+        end: 22,
       },
     ]);
     expect(content).toContain(
@@ -125,5 +139,100 @@ describe("synchronizeClaimSources", () => {
     await expect(
       readFile(path.join(rootDir, "openwiki/page.md"), "utf8"),
     ).resolves.toBe(content);
+  });
+
+  test("deduplicates identical line ranges", async () => {
+    const { backend, rootDir } = await setup();
+    await backend.write(
+      "/openwiki/page.md",
+      "---\ntype: Reference\n---\n\n# Page\n",
+    );
+
+    await synchronizeClaimSources(
+      backend,
+      "repository",
+      new Map([
+        [
+          "/openwiki/page.md",
+          [
+            "repo://src/a.ts#L1-L2",
+            "repo://src/a.ts#L1-L2",
+            "repo://src/b.ts#L3-L5",
+          ],
+        ],
+      ]),
+    );
+
+    const content = await readFile(
+      path.join(rootDir, "openwiki/page.md"),
+      "utf8",
+    );
+    const sources = parseFrontmatterFields(content)?.sources;
+    expect(sources).toEqual([
+      {
+        id: openWikiSourceId("repo://src/a.ts#L1-L2"),
+        resource: "repo://src/a.ts",
+        start: 1,
+        end: 2,
+      },
+      {
+        id: openWikiSourceId("repo://src/b.ts#L3-L5"),
+        resource: "repo://src/b.ts",
+        start: 3,
+        end: 5,
+      },
+    ]);
+  });
+
+  test("preserves independent range sources and prevents code-owned duplicates", async () => {
+    const { backend, rootDir } = await setup();
+    await backend.write(
+      "/openwiki/page.md",
+      [
+        "---",
+        "type: Reference",
+        "sources:",
+        "  - id: manual-a",
+        "    resource: repo://src/a.ts#L1-L2",
+        "---",
+        "",
+        "# Page",
+        "",
+      ].join("\n"),
+    );
+
+    await synchronizeClaimSources(
+      backend,
+      "repository",
+      new Map([
+        [
+          "/openwiki/page.md",
+          [
+            "repo://src/a.ts#L1-L2",
+            "repo://src/a.ts#L5-L10",
+          ],
+        ],
+      ]),
+    );
+
+    const content = await readFile(
+      path.join(rootDir, "openwiki/page.md"),
+      "utf8",
+    );
+    const sources = parseFrontmatterFields(content)?.sources;
+    expect(sources).toEqual([
+      {
+        id: "manual-a",
+        resource: "repo://src/a.ts",
+        start: 1,
+        end: 2,
+      },
+      {
+        id: openWikiSourceId("repo://src/a.ts#L5-L10"),
+        resource: "repo://src/a.ts",
+        start: 5,
+        end: 10,
+      },
+    ]);
   });
 });

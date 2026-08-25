@@ -666,3 +666,134 @@ hr.rule {
   color: var(--lc-blue);
   font-weight: 700;
 }
+
+/* Right-side page outline */
+.toc {
+  width: 220px;
+  flex: 0 0 auto;
+  border-left: 1px solid var(--edge);
+  background: var(--panel);
+  overflow-y: auto;
+  padding: 28px 18px;
+}
+.toc.hidden {
+  display: none;
+}
+.toc-head {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 14px;
+}
+.toc-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.toc a {
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--muted);
+  text-decoration: none;
+  padding: 3px 0 3px 10px;
+  border-left: 2px solid transparent;
+  transition:
+    color 0.12s ease,
+    border-color 0.12s ease;
+}
+.toc a:hover {
+  color: var(--text);
+}
+.toc a.active {
+  color: var(--lc-blue);
+  border-left-color: var(--lc-blue);
+}
+.toc a.toc-level-3 {
+  padding-left: 22px;
+}
+.toc a.toc-level-4 {
+  padding-left: 34px;
+}
+
+/* Page provenance metadata */
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 18px;
+}
+.meta b {
+  color: var(--heading);
+  font-weight: 600;
+}
+
+/* Collapsible source files */
+.sources {
+  margin-bottom: 22px;
+  border: 1px solid var(--edge);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: var(--bg);
+}
+.sources summary {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--heading);
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+}
+.sources summary::-webkit-details-marker {
+  display: none;
+}
+.sources summary::before {
+  content: "▶";
+  font-size: 10px;
+  color: var(--muted);
+  transition: transform 0.15s ease;
+}
+.sources[open] summary::before {
+  transform: rotate(90deg);
+}
+.sources-count {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-radius: 100px;
+  padding: 1px 8px;
+  margin-left: 4px;
+}
+.source-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 4px;
+}
+.source-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  padding: 5px 10px;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+.source-chip:hover {
+  border-color: var(--lc-blue);
+  color: var(--lc-blue);
+}

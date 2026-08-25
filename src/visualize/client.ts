@@ -1,4 +1,4 @@
-import type { WikiGraph, WikiNode } from "./graph.js";
+import type { WikiGraph, WikiNode, WikiSource } from "./graph.js";
 import {
   colorsForTypes,
   escapeHtml,
@@ -673,6 +673,8 @@ function clearSelection(): void {
   highlightNodes.clear();
   highlightLinks.clear();
   $("#detail").innerHTML = EMPTY_HTML;
+  $("#toc-body").innerHTML = "";
+  $("#toc").classList.add("hidden");
   refreshSidebarActive();
 }
 
@@ -709,11 +711,14 @@ function renderReader(id: string): void {
     `<h1 class="doc-title">${escapeHtml(n.title)}</h1>` +
     desc +
     tags +
+    renderMeta(n) +
+    renderSources(n) +
     `<hr class="rule" />` +
     `<div class="md">${html}</div>` +
     back;
   rewriteLinks(n);
   renderMermaid();
+  buildToc();
   $("#detail").scrollTop = 0;
   $("#detail")
     .querySelectorAll<HTMLElement>(".chip")
@@ -724,6 +729,104 @@ function renderReader(id: string): void {
       }),
     );
   refreshSidebarActive();
+}
+
+function formatDate(at: string): string {
+  try {
+    return new Date(at).toLocaleString(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+  } catch {
+    return at;
+  }
+}
+
+function renderMeta(n: WikiNode): string {
+  const parts: string[] = [];
+  if (n.generated) {
+    const when = n.generated.at ? ` · ${formatDate(n.generated.at)}` : "";
+    parts.push(
+      `<span><b>Generated</b>${when} by ${escapeHtml(n.generated.by)}</span>`,
+    );
+  }
+  if (n.verified?.length) {
+    const v = n.verified[0];
+    const when = v.at ? ` · ${formatDate(v.at)}` : "";
+    parts.push(`<span><b>Verified</b>${when} by ${escapeHtml(v.by)}</span>`);
+  }
+  return parts.length ? `<div class="meta">${parts.join("")}</div>` : "";
+}
+
+function renderSources(n: WikiNode): string {
+  if (!n.sources?.length) return "";
+  const chips = n.sources
+    .map((s: WikiSource) => {
+      let label = s.resource;
+      if (label.startsWith("repo://")) label = label.slice(7);
+      if (typeof s.start === "number" && typeof s.end === "number") {
+        label += ` L${s.start}-L${s.end}`;
+      } else if (typeof s.start === "number") {
+        label += ` L${s.start}`;
+      }
+      return `<span class="source-chip" title="${escapeHtml(s.resource)}">${escapeHtml(label)}</span>`;
+    })
+    .join("");
+  return (
+    `<details class="sources">` +
+    `<summary>Relevant source files <span class="sources-count">${n.sources.length}</span></summary>` +
+    `<div class="source-chips">${chips}</div>` +
+    `</details>`
+  );
+}
+
+function slugify(text: string): string {
+  return (
+    text
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, "-")
+      .replace(/^-|-$/g, "") || "heading"
+  );
+}
+
+function buildToc(): void {
+  const detail = $("#detail");
+  const headings = [
+    ...detail.querySelectorAll<HTMLHeadingElement>(".md h2, .md h3, .md h4"),
+  ];
+  const toc = $("#toc");
+  const tocBody = $("#toc-body");
+  if (!headings.length) {
+    tocBody.innerHTML = "";
+    toc.classList.add("hidden");
+    return;
+  }
+  const slugs = new Map<string, number>();
+  const links = headings
+    .map((h) => {
+      const level = Number(h.tagName[1]);
+      const text = h.textContent?.trim() ?? "";
+      let slug = slugify(text);
+      const count = slugs.get(slug) ?? 0;
+      slugs.set(slug, count + 1);
+      if (count) slug += `-${count}`;
+      h.id = slug;
+      return `<a href="#${slug}" class="toc-link toc-level-${level}" data-target="${slug}">${escapeHtml(text)}</a>`;
+    })
+    .join("");
+  tocBody.innerHTML = links;
+  toc.classList.remove("hidden");
+  tocBody.querySelectorAll<HTMLAnchorElement>("a").forEach((a) =>
+    a.addEventListener("click", (e) => {
+      e.preventDefault();
+      const target = detail.querySelector<HTMLElement>(
+        `[id="${a.dataset.target}"]`,
+      );
+      if (target) {
+        detail.scrollTop = target.offsetTop - 16;
+      }
+    }),
+  );
 }
 
 /**

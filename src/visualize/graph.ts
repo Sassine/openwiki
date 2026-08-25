@@ -1,9 +1,27 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
+import { parse } from "yaml";
 
 /**
  * The known-typed subset of frontmatter OpenWiki writes at the top of each page.
  */
+export interface GeneratedEvent {
+  by: string;
+  at?: string;
+}
+
+export interface VerifiedEvent {
+  by: string;
+  at?: string;
+}
+
+export interface WikiSource {
+  resource: string;
+  id?: string;
+  start?: number;
+  end?: number;
+}
+
 export interface WikiMeta {
   /**
    * The page's declared kind, e.g. "Reference" or "Section".
@@ -32,6 +50,12 @@ export interface WikiMeta {
    * @default undefined - the node's tags become an empty array.
    */
   tags?: string[];
+
+  generated?: GeneratedEvent;
+
+  verified?: VerifiedEvent[];
+
+  sources?: WikiSource[];
 }
 
 /**
@@ -82,6 +106,12 @@ export interface WikiNode {
    * Ids of pages that link to this page (incoming edges).
    */
   backlinks: string[];
+
+  generated?: GeneratedEvent;
+
+  verified?: VerifiedEvent[];
+
+  sources?: WikiSource[];
 }
 
 /**
@@ -132,7 +162,7 @@ export interface WikiGraph {
 /**
  * A raw frontmatter map: each key is either a scalar string or a string list.
  */
-type RawMeta = Record<string, string | string[]>;
+type RawMeta = Record<string, unknown>;
 
 /**
  * Pages that are generation scaffolding, not real wiki content.
@@ -145,15 +175,9 @@ const EXCLUDED_FILES = new Set(["INSTRUCTIONS.md", "log.md"]);
 const MARKDOWN_LINK = /\]\(([^)\s]+\.md)(?:#[^)]*)?\)/g;
 
 /**
- * Strip a single pair of surrounding single or double quotes.
- */
-function stripQuotes(value: string): string {
-  return value.replace(/^['"]|['"]$/g, "");
-}
-
-/**
- * Split a markdown file's YAML frontmatter from its body. Only the small subset
- * OpenWiki emits (scalars, inline `[a, b]` arrays, and dashed lists) is parsed.
+ * Split a markdown file's YAML frontmatter from its body and parse it with
+ * the `yaml` library so structured provenance fields (`sources`, `generated`,
+ * `verified`) are preserved.
  */
 export function splitFrontmatter(raw: string): { meta: RawMeta; body: string } {
   if (!raw.startsWith("---")) {
@@ -166,30 +190,18 @@ export function splitFrontmatter(raw: string): { meta: RawMeta; body: string } {
   const block = raw.slice(3, end).trim();
   const body = raw.slice(raw.indexOf("\n", end + 1) + 1);
   const meta: RawMeta = {};
-  let pendingListKey: string | undefined;
-  for (const line of block.split("\n")) {
-    const listItem = line.match(/^\s*-\s+(.*)$/);
-    if (listItem && pendingListKey) {
-      (meta[pendingListKey] as string[]).push(stripQuotes(listItem[1].trim()));
-      continue;
-    }
-    const kv = line.match(/^([A-Za-z0-9_]+):\s*(.*)$/);
-    if (!kv) continue;
-    const [, key, rawValue] = kv;
-    const value = rawValue.trim();
-    if (value === "") {
-      pendingListKey = key;
-      meta[key] = [];
-    } else if (value.startsWith("[") && value.endsWith("]")) {
-      pendingListKey = undefined;
-      meta[key] = value
-        .slice(1, -1)
-        .split(",")
-        .map((item) => stripQuotes(item.trim()))
-        .filter(Boolean);
-    } else {
-      pendingListKey = undefined;
-      meta[key] = stripQuotes(value);
+  if (block) {
+    try {
+      const parsed: unknown = parse(block, {
+        maxAliasCount: 100,
+        schema: "core",
+        uniqueKeys: true,
+      }) as unknown;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        Object.assign(meta, parsed as RawMeta);
+      }
+    } catch {
+      // Leave meta empty if the frontmatter is not valid YAML.
     }
   }
   return { meta, body };
@@ -199,14 +211,63 @@ export function splitFrontmatter(raw: string): { meta: RawMeta; body: string } {
  * Read the known OpenWiki fields out of a raw frontmatter map, typed.
  */
 function readMeta(raw: RawMeta): WikiMeta {
-  const scalar = (value: string | string[] | undefined): string | undefined =>
+  const scalar = (value: unknown): string | undefined =>
     typeof value === "string" ? value : undefined;
+  const tags = Array.isArray(raw.tags)
+    ? raw.tags.filter((t): t is string => typeof t === "string")
+    : undefined;
   return {
     type: scalar(raw.type),
     title: scalar(raw.title),
     description: scalar(raw.description),
-    tags: Array.isArray(raw.tags) ? raw.tags : undefined,
+    tags,
+    generated: readGenerated(raw.generated),
+    verified: readVerified(raw.verified),
+    sources: readSources(raw.sources),
   };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isActorEvent(value: unknown): value is { by: string; at?: string } {
+  return (
+    isRecord(value) &&
+    typeof value.by === "string" &&
+    value.by !== "" &&
+    (!Object.hasOwn(value, "at") || typeof value.at === "string")
+  );
+}
+
+function readGenerated(value: unknown): GeneratedEvent | undefined {
+  if (typeof value === "string" && value) return { by: value };
+  return isActorEvent(value) ? { by: value.by, at: value.at } : undefined;
+}
+
+function readVerified(value: unknown): VerifiedEvent[] | undefined {
+  const events = Array.isArray(value)
+    ? value
+    : isActorEvent(value)
+      ? [value]
+      : [];
+  const verified = events.filter(isActorEvent);
+  return verified.length ? verified : undefined;
+}
+
+function readSources(value: unknown): WikiSource[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const sources: WikiSource[] = [];
+  for (const entry of value) {
+    if (isRecord(entry) && typeof entry.resource === "string" && entry.resource) {
+      const source: WikiSource = { resource: entry.resource };
+      if (typeof entry.id === "string") source.id = entry.id;
+      if (typeof entry.start === "number") source.start = entry.start;
+      if (typeof entry.end === "number") source.end = entry.end;
+      sources.push(source);
+    }
+  }
+  return sources.length ? sources : undefined;
 }
 
 /**
@@ -289,6 +350,9 @@ async function readNode(file: string, wikiRoot: string): Promise<WikiNode> {
     tags: meta.tags ?? [],
     body,
     size: body.length,
+    generated: meta.generated,
+    verified: meta.verified,
+    sources: meta.sources,
     links: [],
     backlinks: [],
   };

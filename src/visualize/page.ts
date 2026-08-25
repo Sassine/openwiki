@@ -81,6 +81,10 @@ ${cspMeta}
       <div>Select a page to read it, or explore the graph.</div>
     </div>
   </div>
+  <nav class="toc" id="toc">
+    <div class="toc-head">On this page</div>
+    <div class="toc-body" id="toc-body"></div>
+  </nav>
 </div>
 <div class="toast" id="toast">Wiki updated</div>
 <script type="module" src="${clientUrl}"></script>
